@@ -15,19 +15,9 @@ const check = (a, b, x, y) => {
  */
 export const checkTime = (a, b, x, y) => {
   const times1 = [], times2 = [];
-  if (a < b) {
-    //未跨天
-    times1.push([a, b]);
-  }else{
-    //跨天
-    times1.push([a, "24:00"], ["00:00", b]);
-  }
-  
-  if (x < y) {
-    times2.push([x, y]);
-  }else{
-    times2.push([x, "24:00"], ["00:00", y]);
-  }
+  // 是否跨天
+  a < b ? times1.push([a, b]) : times1.push([a, "24:00"], ["00:00", b])
+  x < y ? times2.push([x, y]) : times2.push([x, "24:00"], ["00:00", y])
   
   let flag = false;
   //循环比较时间段是否冲突
@@ -46,5 +36,14 @@ export const checkTime = (a, b, x, y) => {
     return true;
   }
 }
-
+export const checkTimes = (times: string[],startTime: string,endTime: string) => {
+  let haveSeat = true
+  times.forEach(v => {
+    const items = v.split('-')
+    if(!checkTime(items[0],items[1],startTime,endTime)){
+      haveSeat = false
+    }
+  });
+  return haveSeat
+}
 

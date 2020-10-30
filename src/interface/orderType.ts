@@ -12,3 +12,11 @@ export interface OrderType {
 export interface FindOrderType {
   account: string   // 账号
 }
+export interface GetSeatType {
+  startTime: string
+  date: string
+  useTime: number
+}
+export interface GetOrderType {
+  account: string   // 账号
+}

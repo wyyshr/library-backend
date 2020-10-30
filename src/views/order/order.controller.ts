@@ -1,6 +1,6 @@
 import { Controller, Get, Query } from '@nestjs/common';
 import { OrderService } from './order.service';
-import { OrderType, FindOrderType } from 'src/interface/orderType';
+import { OrderType, FindOrderType, GetSeatType, GetOrderType } from 'src/interface/orderType';
 import { SignInType } from 'src/interface/signInType';
 
 @Controller('order')
@@ -27,5 +27,15 @@ export class OrderController {
   @Get('/signOut')
   signOut(@Query() query: SignInType) {
     return this.orderService.signOut(query)
+  }
+
+  @Get('/getSeat')
+  getSeat(@Query() query: GetSeatType) {
+    return this.orderService.getSeat(query)
+  }
+
+  @Get('/getOrder')
+  getOrder(@Query() query: GetOrderType) {
+    return this.orderService.getOrder(query)
   }
 }
