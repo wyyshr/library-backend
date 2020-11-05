@@ -4,8 +4,10 @@ import { Order } from 'src/entity/order.entity';
 import { Repository } from 'typeorm';
 import { OrderType, FindOrderType, GetSeatType, GetOrderType } from 'src/interface/orderType';
 import { SignInType } from 'src/interface/signInType';
-import { checkTime, checkTimes } from 'src/config/config';
+import { checkTime, checkTimes, DateMinus } from 'src/config/config';
 import { Seat } from 'src/entity/seat.entity';
+import { ViolateType } from 'src/interface/violateType';
+import { Violate } from 'src/entity/violate.entity';
 
 @Injectable()
 export class OrderService {
@@ -14,10 +16,24 @@ export class OrderService {
     private readonly orderRepository: Repository<Order>,
 
     @InjectRepository(Seat) 
-    private readonly seatRepository: Repository<Seat>
+    private readonly seatRepository: Repository<Seat>,
+
+    @InjectRepository(Violate) 
+    private readonly violateRepository: Repository<Violate>,
   ){}
 
   async order(query: OrderType) {
+    const account = await this.violateRepository.findOne({account: query.account})
+    // 存在黑名单
+    if(account){
+      const orderDate = query.date.slice(0,-3)
+      const violateDate = account.date.slice(0, -3)
+      const day1 = `${orderDate.slice(0,2)}/${orderDate.slice(3,5)}`
+      const day2 = `${violateDate.slice(0,2)}/${violateDate.slice(3,5)}`
+      const minusDays = DateMinus(day1, day2)
+      if(minusDays < 3) return { type: 'none', msg: `${3 - minusDays}天内不可预约` }
+    }
+
     const seat = {
       roomNum: query.roomNum, 
       seatNum: query.seatNum
@@ -104,8 +120,12 @@ export class OrderService {
       endTime: query.endTime,
     }
     const orderArr = await this.orderRepository.find(findOrderArr)
+    const thisseat = {roomNum: query.roomNum, seatNum: query.seatNum}
     if(orderArr[0]){
       await this.orderRepository.update(findOrderArr,{ isLeave: true })
+      const thisSeat = await this.seatRepository.findOne(thisseat)
+      if(!thisSeat) return 'error'
+      this.cancleSeat(query)  // 取消座位
       return 'success'
     }else{
       return 'error'
@@ -192,5 +212,41 @@ export class OrderService {
   // 获取预约记录
   async getOrder(query: GetOrderType){
     return await this.orderRepository.find(query)
+  }
+
+  // 违约
+  async violate(query: ViolateType){
+    this.cancleSeat(query)  // 取消座位
+    const account = await this.violateRepository.findOne({account: query.account})
+    account ?
+    await this.violateRepository.update({account: query.account},{times: account.times + 1, date: query.date}) :
+    await this.violateRepository.save({account: query.account, times: 1, date: query.date});
+    return 'success'
+  }
+  // 取消座位
+  async cancleSeat(query: SignInType) {
+    const seat = { roomNum: query.roomNum, seatNum: query.seatNum }
+    const thisSeat = await this.seatRepository.findOne(seat)
+    if(!thisSeat) return 'error'
+    const chooseTime1Arr = thisSeat.chooseTime1.split(',');
+    const chooseTime2Arr = thisSeat.chooseTime2.split(',');
+    const newChooseTime1Arr = chooseTime1Arr.filter(v => v != `${query.startTime}-${query.endTime}`);
+    const newChooseTime2Arr = chooseTime2Arr.filter(v => v != `${query.startTime}-${query.endTime}`);
+    // 只有一天，第一天，仅有一个预约
+    (thisSeat.date1 == query.date && !thisSeat.date2 && chooseTime1Arr.length == 1) && await this.seatRepository.update(seat,{ date1: '', chooseTime1: '', isOrder: false });
+    // 只有一天，第二天，仅有一个预约
+    (thisSeat.date2 == query.date && !thisSeat.date1 && chooseTime2Arr.length == 1) && await this.seatRepository.update(seat,{ date2: '', chooseTime2: '', isOrder: false });
+    // 两天都有，第一天，仅有一个预约
+    (thisSeat.date1 == query.date && thisSeat.date2 && chooseTime1Arr.length == 1) && await this.seatRepository.update(seat,{ date1: '', chooseTime1: '' });
+    // 两天都有，第二天，仅有一个预约
+    (thisSeat.date2 == query.date && thisSeat.date1 && chooseTime2Arr.length == 1) && await this.seatRepository.update(seat,{ date2: '', chooseTime2: '' });
+    // 第一天，有多个预约
+    chooseTime1Arr.length > 1 && await this.seatRepository.update(seat,{ chooseTime1: newChooseTime1Arr.join(',') });
+    // 第二天，有多个预约
+    chooseTime2Arr.length > 1 && await this.seatRepository.update(seat,{ chooseTime2: newChooseTime2Arr.join(',') });
+    // 两天都有，第一天，有多个预约
+    // (thisSeat.date1 == query.date && thisSeat.date2 && chooseTime1Arr.length > 1) && await this.seatRepository.update(seat,{ chooseTime1: newChooseTime1Arr.join(',') });
+    // 两天都有，第二天，有多个预约
+    // (thisSeat.date2 == query.date && thisSeat.date1 && chooseTime2Arr.length > 1) && await this.seatRepository.update(seat,{ chooseTime2: newChooseTime2Arr.join(',') });
   }
 }
