@@ -14,4 +14,5 @@ export class Order{
   @Column() seatNum: number   // 座位号
   @Column() isCome: boolean   // 是否签到
   @Column() isLeave: boolean  // 是否签退
+  @Column() isViolate: boolean  // 是否违约
 }

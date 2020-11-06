@@ -15,6 +15,7 @@ export class SeatService {
 
   // 获取座位
   async getAllSeat(query: GetAllSeatType){
+    this.changeDate()    // 初始化座位
     const allSeats = await this.seatRepository.find()
     const findObj = {
       pageSize: query.pageSize,
@@ -26,7 +27,6 @@ export class SeatService {
 
     return await allSeats.slice(first, second)
   }
-
   // 添加座位
   async addSeat(query: AddSeatType){
     const seats = await this.seatRepository.find(query)
@@ -38,5 +38,20 @@ export class SeatService {
   async deleteSeat(body: DeleteSeatType) {
     await this.seatRepository.delete(body.id)
     return 'success'
+  }
+  // 初始化座位
+  async changeDate(){
+    const date = new Date()
+    const month = date.getMonth() + 1
+    const day = date.getDate().toString().length == 1 ? '0'+date.getDate() : date.getDate()
+    const today = `${month}月${day}日`
+    const allSeats = await this.seatRepository.find()
+    for (let i = 0; i < allSeats.length; i++) {
+      const v = allSeats[i];
+      // 第一天是昨天且第二天有预约
+      (v.date1.split('-')[0] != today && v.date2) && await this.seatRepository.update(v,{ date1: v.date2, date2: '', chooseTime1: v.chooseTime2, chooseTime2: '' });
+      // 第一天是昨天且第二天没有预约
+      (v.date1.split('-')[0] != today && !v.date2) && await this.seatRepository.update({id: v.id},{date1: '', chooseTime1: '', isOrder: false});
+    }
   }
 }

@@ -64,3 +64,13 @@ export const DateMinus = (date1: string, date2: string) => {
   const day = days / (1000 * 60 * 60 * 24); 
   return day; 　
 }
+
+export const intervalTime = (startTime, endTime) => {
+  const start1 = startTime.split(":");
+  const startAll = parseInt(start1[0]) * 60 + parseInt(start1[1]);
+    
+  const end1 = endTime.split(":");
+  const endAll = parseInt(end1[0]) * 60 + parseInt(end1[1]);
+  
+  return endAll-startAll
+}

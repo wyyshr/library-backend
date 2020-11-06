@@ -46,9 +46,9 @@ export class OrderController {
     return this.orderService.getOrder(query)
   }
 
-  // 违约
-  @Get('/violate')
-  violate(@Query() query: ViolateType){
-    return this.orderService.violate(query)
+  // 检查订单（是否存在违约）
+  @Get('/checkOrder')
+  checkOrder(){
+    return this.orderService.checkOrder()
   }
 }

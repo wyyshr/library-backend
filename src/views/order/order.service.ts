@@ -4,7 +4,7 @@ import { Order } from 'src/entity/order.entity';
 import { Repository } from 'typeorm';
 import { OrderType, FindOrderType, GetSeatType, GetOrderType } from 'src/interface/orderType';
 import { SignInType } from 'src/interface/signInType';
-import { checkTime, checkTimes, DateMinus } from 'src/config/config';
+import { checkTime, checkTimes, DateMinus, intervalTime } from 'src/config/config';
 import { Seat } from 'src/entity/seat.entity';
 import { ViolateType } from 'src/interface/violateType';
 import { Violate } from 'src/entity/violate.entity';
@@ -22,6 +22,7 @@ export class OrderService {
     private readonly violateRepository: Repository<Violate>,
   ){}
 
+  // 预约座位
   async order(query: OrderType) {
     const account = await this.violateRepository.findOne({account: query.account})
     // 存在黑名单
@@ -30,7 +31,7 @@ export class OrderService {
       const violateDate = account.date.slice(0, -3)
       const day1 = `${orderDate.slice(0,2)}/${orderDate.slice(3,5)}`
       const day2 = `${violateDate.slice(0,2)}/${violateDate.slice(3,5)}`
-      const minusDays = DateMinus(day1, day2)
+      const minusDays = DateMinus(day2, day1)
       if(minusDays < 3) return { type: 'none', msg: `${3 - minusDays}天内不可预约` }
     }
 
@@ -81,7 +82,8 @@ export class OrderService {
       ...query,
       endTime,
       isCome: false,
-      isLeave: false
+      isLeave: false,
+      isViolate: false
     })
     return {type: 'success', msg: '预约成功'}
   }
@@ -134,6 +136,7 @@ export class OrderService {
 
   // 获取座位
   async getSeat(query: GetSeatType) {
+    this.changeDate()    // 初始化座位
     const isNotOrderSeats = await this.seatRepository.find({isOrder: false})  // 未被预定
     // 有空座位
     if(isNotOrderSeats[0]) return { type: 'success', msg: { roomNum: isNotOrderSeats[0].roomNum, seatNum: isNotOrderSeats[0].seatNum } }
@@ -216,11 +219,25 @@ export class OrderService {
 
   // 违约
   async violate(query: ViolateType){
+    const order = await this.orderRepository.findOne({
+      account: query.account,
+      startTime: query.startTime,
+      date: query.date
+    })
+    if(!order) return 'error'
     this.cancleSeat(query)  // 取消座位
     const account = await this.violateRepository.findOne({account: query.account})
     account ?
     await this.violateRepository.update({account: query.account},{times: account.times + 1, date: query.date}) :
     await this.violateRepository.save({account: query.account, times: 1, date: query.date});
+    await this.orderRepository.update({
+      account: query.account,
+      date: query.date,
+      startTime: query.startTime,
+      endTime: query.endTime,
+      roomNum: query.roomNum,
+      seatNum: query.seatNum
+    },{isViolate: true})    // 修改订单违约信息
     return 'success'
   }
   // 取消座位
@@ -248,5 +265,50 @@ export class OrderService {
     // (thisSeat.date1 == query.date && thisSeat.date2 && chooseTime1Arr.length > 1) && await this.seatRepository.update(seat,{ chooseTime1: newChooseTime1Arr.join(',') });
     // 两天都有，第二天，有多个预约
     // (thisSeat.date2 == query.date && thisSeat.date1 && chooseTime2Arr.length > 1) && await this.seatRepository.update(seat,{ chooseTime2: newChooseTime2Arr.join(',') });
+  }
+  // 初始化座位
+  async changeDate(){
+    const date = new Date()
+    const month = date.getMonth() + 1
+    const day = date.getDate().toString().length == 1 ? '0'+date.getDate() : date.getDate()
+    const today = `${month}月${day}日`
+    const allSeats = await this.seatRepository.find()
+    for (let i = 0; i < allSeats.length; i++) {
+      const v = allSeats[i];
+      // 第一天是昨天且第二天有预约
+      (v.date1.split('-')[0] != today && v.date2) && await this.seatRepository.update(v,{ date1: v.date2, date2: '', chooseTime1: v.chooseTime2, chooseTime2: '' });
+      // 第一天是昨天且第二天没有预约
+      (v.date1.split('-')[0] != today && !v.date2) && await this.seatRepository.update({id: v.id},{date1: '', chooseTime1: '', isOrder: false});
+    }
+  }
+  // 检查订单
+  async checkOrder(){
+    const date = new Date()
+    const month = date.getMonth() + 1
+    const day = date.getDate().toString().length == 1 ? '0'+date.getDate() : date.getDate()
+    const week = date.getDay()
+    const today = `${month}月${day}日-周${week == 0 ? 7 : week}`
+    const todayOrders = await this.orderRepository.find({date: today})
+    const hour = date.getHours()
+    const minute = date.getMinutes().toString().length == 1 ? `0${date.getMinutes()}` : date.getMinutes()
+    const now = `${hour}:${minute}`
+    // 今日还未签到订单
+    const notSingInOrders = todayOrders.filter(v => !v.isCome)
+    if(!notSingInOrders[0]) return 'success'
+    for (let i = 0; i < notSingInOrders.length; i++) {
+      const v = notSingInOrders[i];
+      // 开始时间 <= 当前时间 且 相差大于15分钟
+      if(parseInt(v.startTime.split(':')[0]) <= hour && intervalTime(v.startTime, now) > 15){
+        // 违约
+        this.violate({
+          account: v.account,
+          roomNum: v.roomNum,
+          seatNum: v.seatNum,
+          startTime: v.startTime,
+          endTime: v.endTime,
+          date: v.date
+        }) 
+      }
+    }
   }
 }
