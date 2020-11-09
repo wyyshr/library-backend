@@ -25,7 +25,10 @@ export class SeatService {
     const first = findObj.current * findObj.pageSize - findObj.pageSize
     const second = findObj.pageSize * findObj.current
 
-    return await allSeats.slice(first, second)
+    return {
+      list: allSeats.slice(first, second),
+      total: findObj.length
+    }
   }
   // 添加座位
   async addSeat(query: AddSeatType){

@@ -46,9 +46,21 @@ export class OrderController {
     return this.orderService.getOrder(query)
   }
 
+  // 获取所有预约
+  @Get('/getAllOrder')
+  getAllOrder() {
+    return this.orderService.getAllOrder()
+  }
+
   // 检查订单（是否存在违约）
   @Get('/checkOrder')
   checkOrder(){
     return this.orderService.checkOrder()
+  }
+
+  // 获取每日订单数量
+  @Get('/getDailyOrder')
+  getDailyOrder() {
+    return this.orderService.getDailyOrder()
   }
 }

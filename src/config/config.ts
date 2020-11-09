@@ -37,10 +37,11 @@ export const checkTime = (a, b, x, y) => {
   }
 }
 /**
- * 
+ * 判断时间段数组是否冲突
  * @param times   例 ["7:00-9:00", "10:00-12:00"]
  * @param startTime 例 "8:00"
  * @param endTime   例 "11:00"
+ * @returns false
  */
 export const checkTimes = (times: string[],startTime: string,endTime: string) => {
   let haveSeat = true
@@ -64,8 +65,13 @@ export const DateMinus = (date1: string, date2: string) => {
   const day = days / (1000 * 60 * 60 * 24); 
   return day; 　
 }
-
-export const intervalTime = (startTime, endTime) => {
+/**
+ * 获取时间段相差的分钟数
+ * @param startTime 开始时间  9:00
+ * @param endTime 结束时间  9:15
+ * @returns 15
+ */
+export const intervalTime = (startTime: string, endTime: string) => {
   const start1 = startTime.split(":");
   const startAll = parseInt(start1[0]) * 60 + parseInt(start1[1]);
     

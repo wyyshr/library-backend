@@ -1,6 +1,8 @@
 import { Body, Controller, Get, Post, Query } from '@nestjs/common';
 import { UserService } from './user.service';
 import { AdminType, UserType } from 'src/interface/userType';
+import { GetAllUserType } from 'src/interface/getAllSeatType';
+import { ChangeUserViolateType } from 'src/interface/ChangeUserViolateType';
 
 @Controller('user')
 export class UserController {
@@ -36,7 +38,13 @@ export class UserController {
 
   // 获取用户信息（预约记录）
   @Get('/getUserInfo')
-  getUserInfo(){
-    return this.userService.getUserInfo()
+  getUserInfo(@Query() query: GetAllUserType){
+    return this.userService.getUserInfo(query)
+  }
+
+  // 修改用户违约次数
+  @Post('/changeUserViolate')
+  changeUserViolate(@Body() body: ChangeUserViolateType){
+    return this.userService.changeUserViolate(body)
   }
 }

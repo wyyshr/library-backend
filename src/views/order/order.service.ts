@@ -216,6 +216,10 @@ export class OrderService {
   async getOrder(query: GetOrderType){
     return await this.orderRepository.find(query)
   }
+  // 所有订单
+  async getAllOrder(){
+    return await this.orderRepository.find()
+  }
 
   // 违约
   async violate(query: ViolateType){
@@ -249,22 +253,15 @@ export class OrderService {
     const chooseTime2Arr = thisSeat.chooseTime2.split(',');
     const newChooseTime1Arr = chooseTime1Arr.filter(v => v != `${query.startTime}-${query.endTime}`);
     const newChooseTime2Arr = chooseTime2Arr.filter(v => v != `${query.startTime}-${query.endTime}`);
-    // 只有一天，第一天，仅有一个预约
-    (thisSeat.date1 == query.date && !thisSeat.date2 && chooseTime1Arr.length == 1) && await this.seatRepository.update(seat,{ date1: '', chooseTime1: '', isOrder: false });
-    // 只有一天，第二天，仅有一个预约
-    (thisSeat.date2 == query.date && !thisSeat.date1 && chooseTime2Arr.length == 1) && await this.seatRepository.update(seat,{ date2: '', chooseTime2: '', isOrder: false });
-    // 两天都有，第一天，仅有一个预约
-    (thisSeat.date1 == query.date && thisSeat.date2 && chooseTime1Arr.length == 1) && await this.seatRepository.update(seat,{ date1: '', chooseTime1: '' });
-    // 两天都有，第二天，仅有一个预约
-    (thisSeat.date2 == query.date && thisSeat.date1 && chooseTime2Arr.length == 1) && await this.seatRepository.update(seat,{ date2: '', chooseTime2: '' });
-    // 第一天，有多个预约
-    chooseTime1Arr.length > 1 && await this.seatRepository.update(seat,{ chooseTime1: newChooseTime1Arr.join(',') });
-    // 第二天，有多个预约
-    chooseTime2Arr.length > 1 && await this.seatRepository.update(seat,{ chooseTime2: newChooseTime2Arr.join(',') });
-    // 两天都有，第一天，有多个预约
-    // (thisSeat.date1 == query.date && thisSeat.date2 && chooseTime1Arr.length > 1) && await this.seatRepository.update(seat,{ chooseTime1: newChooseTime1Arr.join(',') });
-    // 两天都有，第二天，有多个预约
-    // (thisSeat.date2 == query.date && thisSeat.date1 && chooseTime2Arr.length > 1) && await this.seatRepository.update(seat,{ chooseTime2: newChooseTime2Arr.join(',') });
+    // 预约的是第一天，且第一天只有一个预约
+    (thisSeat.date1 == query.date && chooseTime1Arr.length == 1) && await this.seatRepository.update(seat,{ date1: '', chooseTime1: '', isOrder: false });
+    // 预约的是第二天，且第二天只有一个预约
+    (thisSeat.date2 == query.date && chooseTime2Arr.length == 1) && await this.seatRepository.update(seat,{ date2: '', chooseTime2: '', isOrder: false });
+    // 预约的是第一天，且第一天有多个预约
+    (thisSeat.date1 == query.date && chooseTime1Arr.length > 1) && await this.seatRepository.update(seat,{ chooseTime1: newChooseTime1Arr.join(',') });
+    // 预约的是第二天，且第二天有多个预约
+    (thisSeat.date2 == query.date && chooseTime2Arr.length > 1) && await this.seatRepository.update(seat,{ chooseTime2: newChooseTime2Arr.join(',') });
+    
   }
   // 初始化座位
   async changeDate(){
@@ -310,5 +307,22 @@ export class OrderService {
         }) 
       }
     }
+  }
+  // 折线图每天订单数量
+  async getDailyOrder() {
+    const allOrders = await this.orderRepository.find()
+    const newAllOrders = allOrders.sort()
+    const result = []
+    for (let i = 0; i < allOrders.length; i++) {
+      const v = newAllOrders[i];
+      let count = 0
+      for (let j = i; j < newAllOrders.length; j++) {
+        const item = newAllOrders[j];
+        v.date == item.date && count++;
+      }
+      result.push({date: v.date, count})
+      i += count;
+    }
+    return result
   }
 }

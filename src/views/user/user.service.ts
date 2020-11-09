@@ -6,6 +6,9 @@ import { User } from 'src/entity/user.entity';
 import { Admin } from 'src/entity/admin.entity';
 import axios from 'axios'
 import { Order } from 'src/entity/order.entity';
+import { GetAllUserType } from 'src/interface/getAllSeatType';
+import { Violate } from 'src/entity/violate.entity';
+import { ChangeUserViolateType } from 'src/interface/ChangeUserViolateType';
 
 @Injectable()
 export class UserService {
@@ -18,6 +21,9 @@ export class UserService {
 
     @InjectRepository(Order) 
     private readonly orderRepository: Repository<Order>,
+
+    @InjectRepository(Violate) 
+    private readonly violateRepository: Repository<Violate>,
   ){}
   
   async register(query: UserType){
@@ -35,15 +41,27 @@ export class UserService {
  
   async adminLogin(body: AdminType){
     const admin = await this.adminRepository.findOne(body)
-    if(!admin) return 'error'
-    return 'success'
+    if(!admin) return {
+      type: 'error',
+      msg: '用户名或密码错误'
+    }
+    return {
+      type: 'success',
+      msg: '登陆成功'
+    }
   }
 
   async adminRegister(body: AdminType){
     const admin = await this.adminRepository.findOne({username: body.username})
-    if(admin) return 'error'
+    if(admin) return {
+      type: 'error',
+      msg: '用户名已存在'
+    }
     await this.adminRepository.save(body)
-    return 'success'
+    return {
+      type: 'success',
+      msg: '注册成功'
+    }
   }
   // 二维码
   async getScanCode() {
@@ -62,18 +80,54 @@ export class UserService {
     return res.data.slice(29, -4)
   }
   // 获取用户信息(含订单)
-  async getUserInfo(){
+  async getUserInfo(query: GetAllUserType){
     const userArr = await this.userRepository.find()
+    const violateArr = await this.violateRepository.find()
+    const findObj = {
+      pageSize: query.pageSize,
+      current: query.current,
+      length: userArr.length
+    }
+    const first = findObj.current * findObj.pageSize - findObj.pageSize
+    const second = findObj.pageSize * findObj.current
+    
     const userOrders = []
     if(userArr[0]){
       for (let i = 0; i < userArr.length; i++) {
         const v = userArr[i];
         const userOrder = await this.orderRepository.find({account: v.account})
-        const userOrderObj = { account: v.account, order: userOrder }
+        const violate = await this.violateRepository.findOne({account: v.account})
+        const userOrderObj = { account: v.account, order: userOrder, violate }
         userOrders.push(userOrderObj)
       }
     }
-    return userOrders
+    if(!query.current) {
+      return userOrders
+    }
+    return {
+      list: userOrders.slice(first, second),
+      total: findObj.length
+    }
   }
-
+  // 修改用户违约次数
+  async changeUserViolate(body: ChangeUserViolateType){
+    const user = await this.violateRepository.findOne({account: body.account})
+    const date = new Date()
+    const month = date.getMonth() + 1
+    const day = date.getDate().toString().length == 1 ? '0'+date.getDate() : date.getDate()
+    const week = date.getDay()
+    const today = `${month}月${day}日-周${week == 0 ? 7 : week}`
+    if(body.times == 0){
+      await this.violateRepository.delete({account: body.account})
+      return 'success'
+    }
+    user ? 
+    await this.violateRepository.update({account: body.account},{times: body.times}) :
+    await this.violateRepository.save({
+      account: body.account,
+      times: body.times,
+      date: today
+    })
+    return 'success'
+  }
 }
